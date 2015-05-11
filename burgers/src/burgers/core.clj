@@ -20,18 +20,55 @@
 (def allMenu {'burger 10 'fries 3 'cheese-burger 13 'bacon-cheese-burger 17 'cheese-fries 5})
 
 (def myMenu (set '(burger fries)))
-
-;(defn serve [food orders items]
-;  "Takes food to serve, a list of orders, and a list of items on-hand.
-;  If the food specified is not in the list of items or in the orders,
-;  then don't make any changes, otherwise remove the item, replace any tools,
-;  and remove the order. returns [success orders items]"
-;
-;(defn toss [food items]
-;  "removes the specified food from the items list, and replaces any
-;  tools which were in use."
   
+(defn execOn [f hm k]
+  (let [n (or (get hm k) 0)]
+  (conj (dissoc hm k) [k (f n)])))
 
+(defn removeEmpty [items]
+  "Removes all items from the list that have <= 0
+  amount. 'items' can be a hash-map '{a 1 b 2}
+  or a list of duples '([a 1] [b 2]).
+  returns a hash-map"
+  (into {} (for
+    [pair (filter
+      #(< 0 (second %))
+      items)]
+    pair)))
+
+(defn extract [food items recipes tools]
+  "removes one of the specified food from items
+  This is provided as shared functionality for SERVE and TOSS"
+  (let [foodCount (get items food)
+        hasFood (not (or (= nil foodCount) (= 0 foodCount)))
+        recipe (get recipes food)
+        ingredients (set (drop-last recipe))]
+  [hasFood
+  (if hasFood
+    (removeEmpty (map #(if 
+                         (and (contains? ingredients (first %)) 
+                              (contains? tools (first %))) 
+                         [(first %) (inc (second %))]
+                         %) 
+                      (merge 
+                        (zipmap (keys tools) (repeat 0)) 
+                        (execOn dec items food))))
+    items)]))
+
+(defn toss [food items recipes tools]
+  (extract food items recipes tools))
+
+(defn removeFirst [k l]
+  (let [[n m] (split-with (partial not= k) l)] (concat n (rest m))))
+
+(defn serve [food items orders recipes tools]
+  (let [hasOrder (contains? (set orders) food)
+        ordersNoFood (removeFirst food orders)
+	itemsNoFood (extract food items recipes tools)]
+  (if (and hasOrder (first itemsNoFood))
+    [true (second itemsNoFood) ordersNoFood]
+    [false items orders])))
+      
 (defn cook [food recipes items]
   "creates the specified food iff the food is a key in the recipes
   and all the necessary items are available. returns the new items
@@ -40,26 +77,26 @@
        ingredients (set (drop-last recipe))
        ingredientsOnHand (clojure.set/intersection ingredients (set (keys items)))
        foodCount (or (get items food) 0)
-       itemsWithFood (conj (dissoc items food) [food (inc foodCount)])]
+       itemsWithFood (execOn inc items food)]
   (if 
     (or 
       (= recipe ()) 
       (not (= (count ingredients) (count ingredientsOnHand))))
     [false items]
-    [true (into {} (for 
-      [pair (filter 
-        (fn [a] (< 0 (second a))) 
-        (map 
-          (fn [b] (if 
-            (contains? ingredients (first b)) 
-            [(first b) (dec (second b))] 
-            b)) 
-          itemsWithFood))] 
-      pair))])))
+    [true (removeEmpty
+      (map 
+        (fn [b] (if 
+          (contains? ingredients (first b)) 
+          [(first b) (dec (second b))] 
+          b)) 
+        itemsWithFood))])))
 
 (defn -main
   "I don't do a whole lot ... yet."
   [& args]
   (println myItems)
-  (println (cook 'burger allRecipes myItems)))
+  (println (cook 'burger allRecipes myItems))
+  (println (extract 'burger (second (cook 'burger allRecipes myItems)) allRecipes allTools))
+  (println (serve 'burger (second (cook 'burger allRecipes myItems)) myOrders allRecipes allTools))
+  (println (serve 'burger (second (cook 'burger allRecipes myItems)) '(burger burger) allRecipes allTools)))
 
