@@ -1,6 +1,7 @@
 (ns burgers.core
   (:gen-class)
-  (:use clojure.set))
+  (:require clojure.set
+            clojure.string))
 
 (def allIngredients {'patty 5 'bun 1 'cheese 1 'porkbelly 2 'potato 1 'oil 1})
 
@@ -15,6 +16,8 @@
 
 (def myOrders ())
 
+(def numCustomers 1)
+
 (def myMoney 0)
 
 (def allMenu {'burger 10 'fries 3 'cheese-burger 13 'bacon-cheese-burger 17 'cheese-fries 5})
@@ -22,8 +25,11 @@
 (def myMenu (set '(burger fries)))
   
 (defn execOn [f hm k]
-  (let [n (or (get hm k) 0)]
+  (let [n (or (k hm) 0)]
   (conj (dissoc hm k) [k (f n)])))
+
+(defn getOrder [menu]
+  (nth menu (int (* (count menu) (rand)))))
 
 (defn removeEmpty [items]
   "Removes all items from the list that have <= 0
@@ -39,9 +45,9 @@
 (defn extract [food items recipes tools]
   "removes one of the specified food from items
   This is provided as shared functionality for SERVE and TOSS"
-  (let [foodCount (get items food)
+  (let [foodCount (food items)
         hasFood (not (or (= nil foodCount) (= 0 foodCount)))
-        recipe (get recipes food)
+        recipe (food recipes)
         ingredients (set (drop-last recipe))]
   [hasFood
   (if hasFood
@@ -73,10 +79,10 @@
   "creates the specified food iff the food is a key in the recipes
   and all the necessary items are available. returns the new items
   list [success items]"
-  (let [recipe (get recipes food)
+  (let [recipe (food recipes)
        ingredients (set (drop-last recipe))
        ingredientsOnHand (clojure.set/intersection ingredients (set (keys items)))
-       foodCount (or (get items food) 0)
+       foodCount (or (food items) 0)
        itemsWithFood (execOn inc items food)]
   (if 
     (or 
@@ -91,12 +97,43 @@
           b)) 
         itemsWithFood))])))
 
-(defn -main
-  "I don't do a whole lot ... yet."
-  [& args]
-  (println myItems)
-  (println (cook 'burger allRecipes myItems))
-  (println (extract 'burger (second (cook 'burger allRecipes myItems)) allRecipes allTools))
-  (println (serve 'burger (second (cook 'burger allRecipes myItems)) myOrders allRecipes allTools))
-  (println (serve 'burger (second (cook 'burger allRecipes myItems)) '(burger burger) allRecipes allTools)))
+(def quit false)
 
+(defn doQuit []
+  (def quit true))
+
+(defn doGetOrder []
+  (getOrder myMenu))
+
+(defn doToss [food]
+  (toss food myItems allRecipes allTools))
+
+(defn doCook [food]
+  (cook food allRecipes myItems))
+
+(defn doServe [food]
+  (serve food myItems myOrders allRecipes allTools))
+
+(defn doPrint []
+  (println myItems)
+  (println numCustomers)
+  (println myOrders))
+
+
+(def input {"quit" doQuit "exit" doQuit "getOrder" doGetOrder "serve" doServe "cook" doCook "make" doCook "toss" doToss "print" doPrint})
+
+(defn -main [& args]
+  (println "finished initialization procedures")
+  (while (not quit) 
+    (let [in (clojure.string/split (read-line) #" ")]
+    ((get input (first in)))))
+  (println "quitting"))
+;
+;  "I don't do a whole lot ... yet."
+;  [& args]
+;  (println myItems)
+;  (println (cook 'burger allRecipes myItems))
+;  (println (extract 'burger (second (cook 'burger allRecipes myItems)) allRecipes allTools))
+;  (println (serve 'burger (second (cook 'burger allRecipes myItems)) myOrders allRecipes allTools))
+;  (println (serve 'burger (second (cook 'burger allRecipes myItems)) '(burger burger) allRecipes allTools)))
+;
